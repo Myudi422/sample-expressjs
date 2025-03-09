@@ -572,6 +572,6 @@ app.put('/api/forms/:slug/status', authenticateToken, async (req, res) => {
 
 
 // Jalankan server
-app.listen(PORT, () => {
+app.listen(port, () => {
   console.log(`Backend berjalan di https://localhost:${PORT}`);
 });
