@@ -431,54 +431,66 @@ app.get('/api/dashboard/status-count', authenticateToken, async (req, res) => {
 
   
   
-  // Save draft
-  app.put('/api/forms/:slug/draft', authenticateToken, async (req, res) => {
-    try {
-      const { slug } = req.params;
-      const { data } = req.body;
-  
-      const [forms] = await pool.execute(
-        'SELECT * FROM form_configurations WHERE slug = ?',
-        [slug]
-      );
-  
-      if (forms.length === 0) {
-        return res.status(404).json({ message: 'Form not found' });
-      }
-  
-      const form = forms[0];
-  
-      // Check email match
-      if (form.assigned_email !== req.user.email) {
-        return res.status(403).json({ message: 'Forbidden' });
-      }
-  
-      // Check if submission exists
-      const [submissions] = await pool.execute(
-        'SELECT * FROM form_submissions WHERE form_config_id = ? AND user_id = ?',
-        [form.id, req.user.id]
-      );
-  
-      if (submissions.length > 0) {
-        // Update existing draft
-        await pool.execute(
-          'UPDATE form_submissions SET data = ?, updated_at = NOW() WHERE id = ?',
-          [JSON.stringify(data), submissions[0].id]
-        );
-      } else {
-        // Create new draft
-        await pool.execute(
-          'INSERT INTO form_submissions (form_config_id, user_id, data) VALUES (?, ?, ?)',
-          [form.id, req.user.id, JSON.stringify(data)]
-        );
-      }
-  
-      res.status(200).json({ message: 'Draft saved successfully' });
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ message: 'Failed to save draft' });
+app.put('/api/forms/:slug/draft', authenticateToken, async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const { data } = req.body;
+
+    const [forms] = await pool.execute(
+      'SELECT * FROM form_configurations WHERE slug = ?',
+      [slug]
+    );
+
+    if (forms.length === 0) {
+      return res.status(404).json({ message: 'Form not found' });
     }
-  });
+
+    const form = forms[0];
+
+    // Jika bukan admin, cek apakah email pemilik form cocok dengan user
+    if (req.user.role !== 'admin' && form.assigned_email !== req.user.email) {
+      return res.status(403).json({ message: 'Forbidden' });
+    }
+
+    // Tentukan target user id: jika admin, gunakan id user dari assigned_email, jika tidak, gunakan req.user.id
+    let targetUserId = req.user.id;
+    if (req.user.role === 'admin') {
+      const [userRows] = await pool.execute(
+        'SELECT id FROM users_legal WHERE email = ?',
+        [form.assigned_email]
+      );
+      if (userRows.length > 0) {
+        targetUserId = userRows[0].id;
+      }
+    }
+
+    // Cek apakah submission sudah ada untuk form ini dan target user
+    const [submissions] = await pool.execute(
+      'SELECT * FROM form_submissions WHERE form_config_id = ? AND user_id = ?',
+      [form.id, targetUserId]
+    );
+
+    if (submissions.length > 0) {
+      // Update existing draft
+      await pool.execute(
+        'UPDATE form_submissions SET data = ?, updated_at = NOW() WHERE id = ?',
+        [JSON.stringify(data), submissions[0].id]
+      );
+    } else {
+      // Create new draft
+      await pool.execute(
+        'INSERT INTO form_submissions (form_config_id, user_id, data) VALUES (?, ?, ?)',
+        [form.id, targetUserId, JSON.stringify(data)]
+      );
+    }
+
+    res.status(200).json({ message: 'Draft saved successfully' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Failed to save draft' });
+  }
+});
+
   
   // Submit form
   app.post('/api/forms/:slug/submit', authenticateToken, async (req, res) => {
