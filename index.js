@@ -374,18 +374,32 @@ app.get('/api/forms/:slug', authenticateToken, async (req, res) => {
       [req.params.slug]
     );
 
-    if (forms.length === 0) return res.status(404).json({ message: 'Form tidak ditemukan' });
+    if (forms.length === 0)
+      return res.status(404).json({ message: 'Form tidak ditemukan' });
 
     const form = forms[0];
-    // Izinkan akses jika user adalah pemilik atau admin
-    if (form.assigned_email !== req.user.email && req.user.role !== 'admin') {
+    // Jika bukan admin, izinkan akses hanya jika user adalah pemilik form (assigned_email)
+    if (req.user.role !== 'admin' && form.assigned_email !== req.user.email) {
       return res.status(403).json({ message: 'Akses ditolak' });
     }
 
-    // Ambil submission
+    // Tentukan target user id untuk mengambil submission
+    let targetUserId = req.user.id;
+    if (req.user.role === 'admin') {
+      // Cari id user dari tabel users_legal berdasarkan assigned_email
+      const [userRows] = await pool.execute(
+        'SELECT id FROM users_legal WHERE email = ?',
+        [form.assigned_email]
+      );
+      if (userRows.length > 0) {
+        targetUserId = userRows[0].id;
+      }
+    }
+
+    // Ambil submission berdasarkan form.id dan targetUserId
     const [submissions] = await pool.execute(
       'SELECT * FROM form_submissions WHERE form_config_id = ? AND user_id = ?',
-      [form.id, req.user.id]
+      [form.id, targetUserId]
     );
 
     res.json({
@@ -400,6 +414,7 @@ app.get('/api/forms/:slug', authenticateToken, async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 });
+
 
 
 // Endpoint untuk mendapatkan count status formulir di dashboard
