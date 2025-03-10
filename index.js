@@ -226,77 +226,84 @@ app.post('/api/forms', authenticateToken, async (req, res) => {
   }
 });
 
-app.get('/files/*', async (req, res) => {
+app.get('/files/*', authenticateToken, async (req, res) => {
   try {
-      res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Type', 'application/json');
 
-      const folderPath = req.params[0]; // Tangkap path setelah /files/
-      const prefix = folderPath.endsWith('/') ? folderPath : folderPath + '/'; // Pastikan ada '/' di akhir
-      const CDN_URL = "https://file.ccgnimex.my.id/file/ccgnimex/"; // URL CDN
+    const folderPath = req.params[0]; // Tangkap path setelah /files/
+    const prefix = folderPath.endsWith('/') ? folderPath : folderPath + '/'; // Pastikan ada '/' di akhir
+    const CDN_URL = "https://file.ccgnimex.my.id/file/ccgnimex/";
 
-      // **1. Fetch dari S3 terlebih dahulu**
-      const data = await s3.listObjectsV2({
-          Bucket: BUCKET_NAME,
-          Prefix: prefix
-      }).promise();
+    // **1. Fetch dari S3 terlebih dahulu**
+    const data = await s3.listObjectsV2({
+      Bucket: BUCKET_NAME,
+      Prefix: prefix
+    }).promise();
 
-      if (!data.Contents || data.Contents.length === 0) {
-          return res.json({ files: [], folders: [] });
+    if (!data.Contents || data.Contents.length === 0) {
+      return res.json({ files: [], folders: [] });
+    }
+
+    // **2. Jika bukan admin, ambil daftar slug yang diizinkan dari DB**
+    let allowedSlugs = [];
+    if (req.user.role !== 'admin') {
+      const [allowedRows] = await pool.execute(
+        'SELECT slug FROM form_configurations WHERE assigned_email = ?',
+        [req.user.email]
+      );
+      allowedSlugs = allowedRows.map(row => row.slug);
+    }
+
+    const folders = new Map(); // Untuk menyimpan folder dengan format { slug, name }
+    const files = [];
+
+    // **3. Proses hasil dari S3 dan filter folder sesuai allowedSlugs**
+    data.Contents.forEach(file => {
+      const relativePath = file.Key.replace(prefix, '');
+      const parts = relativePath.split('/');
+
+      // Jika file berada di dalam folder
+      if (parts.length > 1) {
+        const folderSlug = parts[0];
+        // Jika bukan admin dan folderSlug tidak ada di allowedSlugs, lewati
+        if (req.user.role !== 'admin' && !allowedSlugs.includes(folderSlug)) {
+          return;
+        }
+        // Set folder default (nama sama dengan slug)
+        folders.set(folderSlug, { slug: folderSlug, name: folderSlug });
+      } else {
+        // File yang berada di root
+        files.push({
+          key: relativePath,
+          lastModified: file.LastModified,
+          size: file.Size,
+          storageClass: file.StorageClass,
+          url: `${CDN_URL}${file.Key}`
+        });
       }
+    });
 
-      const folders = new Map(); // Menggunakan Map untuk menyimpan slug dan nama
-      const files = [];
-      const detectedSlugs = new Set();
+    // **4. Query database untuk update nama folder jika ada di tabel form_folder**
+    if (folders.size > 0) {
+      const detectedSlugs = Array.from(folders.keys());
+      const placeholders = detectedSlugs.map(() => '?').join(',');
+      const query = `SELECT slug, nama_folder FROM form_folder WHERE slug IN (${placeholders})`;
+      const [rows] = await pool.execute(query, detectedSlugs);
 
-      // **2. Identifikasi slug yang perlu dicari di database**
-      data.Contents.forEach(file => {
-          const relativePath = file.Key.replace(prefix, '');
-          const parts = relativePath.split('/');
-
-          if (parts.length > 1) {
-              detectedSlugs.add(parts[0]); // Simpan slug yang ditemukan
-              folders.set(parts[0], { slug: parts[0], name: parts[0] }); // Default slug = name
-          }
+      rows.forEach(row => {
+        if (folders.has(row.slug)) {
+          folders.set(row.slug, { slug: row.slug, name: row.nama_folder });
+        }
       });
+    }
 
-      // **3. Query database untuk slug yang ditemukan**
-      if (detectedSlugs.size > 0) {
-          const placeholders = Array.from(detectedSlugs).map(() => '?').join(',');
-          const query = `SELECT slug, nama_folder FROM form_folder WHERE slug IN (${placeholders})`;
-          const [rows] = await pool.execute(query, Array.from(detectedSlugs));
-
-          rows.forEach(row => {
-              if (folders.has(row.slug)) {
-                  folders.set(row.slug, { slug: row.slug, name: row.nama_folder });
-              }
-          });
-      }
-
-      // **4. Proses ulang hasil dari S3**
-      data.Contents.forEach(file => {
-          let relativePath = file.Key.replace(prefix, '');
-          let parts = relativePath.split('/');
-
-          if (parts.length > 1) {
-              folders.set(parts[0], folders.get(parts[0])); // Pastikan folder ada di Map
-          } else {
-              files.push({
-                  key: relativePath,
-                  lastModified: file.LastModified,
-                  size: file.Size,
-                  storageClass: file.StorageClass,
-                  url: `${CDN_URL}${file.Key}`
-              });
-          }
-      });
-
-      res.json({ files, folders: Array.from(folders.values()) });
-
+    res.json({ files, folders: Array.from(folders.values()) });
   } catch (err) {
-      console.error('Error fetching folder contents:', err);
-      res.status(500).json({ error: 'Error fetching folder contents' });
+    console.error('Error fetching folder contents:', err);
+    res.status(500).json({ error: 'Error fetching folder contents' });
   }
 });
+
 
 
 
