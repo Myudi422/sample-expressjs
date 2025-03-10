@@ -305,6 +305,49 @@ app.get('/files/*', authenticateToken, async (req, res) => {
 });
 
 
+app.post('/api/rename', authenticateToken, async (req, res) => {
+  try {
+    // Hanya admin yang boleh mengakses endpoint ini
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Akses ditolak. Hanya admin yang dapat melakukan rename folder.' });
+    }
+
+    const { slug, name } = req.body;
+    
+    // Validasi input
+    if (!slug || !name) {
+      return res.status(400).json({ message: 'Slug dan name harus disediakan' });
+    }
+    
+    // Cek apakah data untuk slug tersebut sudah ada di tabel form_folder
+    const [rows] = await pool.execute(
+      'SELECT * FROM form_folder WHERE slug = ?',
+      [slug]
+    );
+    
+    if (rows.length === 0) {
+      // Jika belum ada, insert data baru
+      await pool.execute(
+        'INSERT INTO form_folder (slug, nama_folder) VALUES (?, ?)',
+        [slug, name]
+      );
+      return res.status(201).json({ message: 'Nama folder berhasil dibuat' });
+    } else {
+      // Jika sudah ada, update nama folder
+      await pool.execute(
+        'UPDATE form_folder SET nama_folder = ? WHERE slug = ?',
+        [name, slug]
+      );
+      return res.status(200).json({ message: 'Nama folder berhasil diperbarui' });
+    }
+  } catch (err) {
+    console.error('Error pada /api/rename:', err);
+    res.status(500).json({ message: 'Terjadi kesalahan pada server' });
+  }
+});
+
+
+
 
 
   
