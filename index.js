@@ -326,10 +326,22 @@ app.post('/api/rename', authenticateToken, async (req, res) => {
     );
     
     if (rows.length === 0) {
-      // Jika belum ada, insert data baru
+      // Jika belum ada, ambil id_form dari tabel form_configurations berdasarkan slug
+      const [fcRows] = await pool.execute(
+        'SELECT id FROM form_configurations WHERE slug = ?',
+        [slug]
+      );
+      
+      if (fcRows.length === 0) {
+        return res.status(400).json({ message: 'Form configuration tidak ditemukan untuk slug tersebut' });
+      }
+      
+      const id_form = fcRows[0].id;
+      
+      // Insert data baru ke form_folder dengan id_form, slug, dan nama_folder
       await pool.execute(
-        'INSERT INTO form_folder (slug, nama_folder) VALUES (?, ?)',
-        [slug, name]
+        'INSERT INTO form_folder (id_form, slug, nama_folder) VALUES (?, ?, ?)',
+        [id_form, slug, name]
       );
       return res.status(201).json({ message: 'Nama folder berhasil dibuat' });
     } else {
