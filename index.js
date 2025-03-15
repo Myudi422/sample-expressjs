@@ -143,6 +143,83 @@ app.post('/api/upload', authenticateToken, upload.single('file'), async (req, re
   }
 });
 
+// Endpoint DELETE untuk menghapus formulir
+app.delete('/api/forms/:slug', authenticateToken, async (req, res) => {
+  try {
+    const { slug } = req.params;
+
+    // Hanya admin yang boleh menghapus
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Akses ditolak' });
+    }
+
+    // Mulai transaksi database
+    const connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    try {
+      // 1. Dapatkan data form configuration
+      const [forms] = await connection.execute(
+        'SELECT * FROM form_configurations WHERE slug = ?',
+        [slug]
+      );
+      
+      if (forms.length === 0) {
+        return res.status(404).json({ message: 'Form tidak ditemukan' });
+      }
+      const form = forms[0];
+
+      // 2. Hapus form_submissions terkait
+      await connection.execute(
+        'DELETE FROM form_submissions WHERE form_config_id = ?',
+        [form.id]
+      );
+
+      // 3. Hapus form_configurations
+      await connection.execute(
+        'DELETE FROM form_configurations WHERE id = ?',
+        [form.id]
+      );
+
+      // 4. Hapus folder di Backblaze
+      const folderPath = `dokasah/berkas/${slug}/`;
+      const listParams = {
+        Bucket: BUCKET_NAME,
+        Prefix: folderPath
+      };
+      
+      const listedObjects = await s3.listObjectsV2(listParams).promise();
+      
+      if (listedObjects.Contents.length > 0) {
+        const deleteParams = {
+          Bucket: BUCKET_NAME,
+          Delete: { Objects: listedObjects.Contents.map(({ Key }) => ({ Key })) }
+        };
+        await s3.deleteObjects(deleteParams).promise();
+      }
+
+      // Hapus folder itu sendiri (jika kosong)
+      await s3.deleteObject({
+        Bucket: BUCKET_NAME,
+        Key: folderPath
+      }).promise();
+
+      // Commit transaksi
+      await connection.commit();
+      res.status(200).json({ message: 'Formulir berhasil dihapus' });
+    } catch (err) {
+      // Rollback transaksi jika ada error
+      await connection.rollback();
+      throw err;
+    } finally {
+      connection.release();
+    }
+  } catch (err) {
+    console.error('Error menghapus formulir:', err);
+    res.status(500).json({ message: 'Gagal menghapus formulir' });
+  }
+});
+
 
 app.post('/api/upload-file', authenticateToken, upload.single('file'), async (req, res) => {
   if (!req.file) {
