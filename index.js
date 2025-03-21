@@ -736,6 +736,29 @@ app.put('/api/forms/:slug/status', authenticateToken, async (req, res) => {
   }
 });
 
+// Endpoint untuk mengambil artikel blog beserta gambar terkait
+app.get('/api/blog/:slug', async (req, res) => {
+  try {
+    const { slug } = req.params;
+    // Ambil artikel berdasarkan slug
+    const [articles] = await pool.execute('SELECT * FROM blog WHERE slug = ?', [slug]);
+    if (articles.length === 0) {
+      return res.status(404).json({ message: "Article not found" });
+    }
+    const article = articles[0];
+
+    // Ambil gambar terkait dari tabel blog_images menggunakan blog_id
+    const [images] = await pool.execute('SELECT * FROM blog_images WHERE blog_id = ?', [article.id]);
+
+    // Kembalikan data artikel dan array gambar
+    res.status(200).json({ ...article, images });
+  } catch (error) {
+    console.error("Error fetching blog article:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+
 
 // Jalankan server
 app.listen(port, () => {
