@@ -758,6 +758,20 @@ app.get('/api/blog/:slug', async (req, res) => {
   }
 });
 
+// Endpoint GET untuk mengambil semua artikel blog
+app.get('/api/blog', async (req, res) => {
+  try {
+    // Query untuk mengambil id, title, slug, dan image utama dari tabel blog
+    const [rows] = await pool.execute(
+      'SELECT id, title, slug, image FROM blog ORDER BY created_at DESC'
+    );
+    res.status(200).json(rows);
+  } catch (error) {
+    console.error('Error fetching blog posts:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 
 
 // Jalankan server
