@@ -773,6 +773,37 @@ app.get('/api/blog', async (req, res) => {
   }
 });
 
+app.post('/api/blog', async (req, res) => {
+  try {
+    const { title, slug } = req.body;
+    const [result] = await pool.execute(
+      'INSERT INTO blog (title, slug) VALUES (?, ?)',
+      [title, slug]
+    );
+    res.status(201).json({ id: result.insertId, title, slug });
+  } catch (error) {
+    console.error('Error creating article:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+
+app.put('/api/blog/:slug', async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const { content } = req.body;
+    await pool.execute(
+      'UPDATE blog SET content = ? WHERE slug = ?',
+      [content, slug]
+    );
+    res.status(200).json({ message: 'Artikel berhasil disimpan' });
+  } catch (error) {
+    console.error('Error updating article:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+
 
 
 // Jalankan server
