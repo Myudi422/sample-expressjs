@@ -736,6 +736,7 @@ app.put('/api/forms/:slug/status', authenticateToken, async (req, res) => {
   }
 });
 
+// Endpoint GET untuk mengambil artikel berdasarkan slug dan gambar terkait
 app.get('/api/blog/:slug', async (req, res) => {
   try {
     const { slug } = req.params;
@@ -758,11 +759,9 @@ app.get('/api/blog/:slug', async (req, res) => {
   }
 });
 
-
 // Endpoint GET untuk mengambil semua artikel blog
 app.get('/api/blog', async (req, res) => {
   try {
-    // Query untuk mengambil id, title, slug, dan image utama dari tabel blog
     const [rows] = await pool.execute(
       'SELECT id, title, slug, image FROM blog ORDER BY created_at DESC'
     );
@@ -773,6 +772,7 @@ app.get('/api/blog', async (req, res) => {
   }
 });
 
+// Endpoint POST untuk membuat artikel baru
 app.post('/api/blog', async (req, res) => {
   try {
     const { title, slug } = req.body;
@@ -787,7 +787,7 @@ app.post('/api/blog', async (req, res) => {
   }
 });
 
-
+// Endpoint PUT untuk update konten artikel
 app.put('/api/blog/:slug', async (req, res) => {
   try {
     const { slug } = req.params;
