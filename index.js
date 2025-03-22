@@ -2,11 +2,11 @@ require("dotenv").config();
 const mysql = require("mysql2/promise");
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
-const multer  = require("multer");
+const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 const bodyParser = require("body-parser");
-const { GenerationServiceClient } = require("@google/generative-ai");
+const { GoogleGenerativeAI } = require("@google/generative-ai"); // Perubahan di sini
 const https = require("https");
 const AWS = require("aws-sdk");
 
@@ -15,13 +15,13 @@ const app = express()
 app.use(bodyParser.json());
 const port = process.env.PORT || 3000
 
-app.use(cors()); // Mengizinkan semua domain
+app.use(cors());
 app.use(express.json());
 
-// Inisialisasi client dengan API key
-const client = new GenerationServiceClient({
-  apiKey: "AIzaSyD-dXiqCXIrupoXCSMZ3U0xHoFqRVyKKW4",
-});
+// Inisialisasi client dengan API key yang benar
+const genAI = new GoogleGenerativeAI("AIzaSyD-dXiqCXIrupoXCSMZ3U0xHoFqRVyKKW4");
+const model = genAI.getGenerativeModel({ model: "gemini-pro" }); // Ganti model jika perlu
+
 
 
 // Konfigurasi AWS SDK untuk Backblaze B2
@@ -819,25 +819,18 @@ app.post("/api/ai/generate", async (req, res) => {
     if (!prompt) {
       return res.status(400).json({ message: "Prompt tidak boleh kosong" });
     }
-    // Buat default prompt dengan menambahkan instruksi SEO dan format HTML
+    
     const defaultPrompt = `buatkan konten dengan SEO Keyword yang bagus untuk "${prompt}" dengan format langsung kasih seperti <h1> <p> dan sebagiannya. jangan teks doang`;
     
-    const request = {
-      model: "gemini-1.5-flash",
-      prompt: defaultPrompt,
-      temperature: 0.7,
-      candidateCount: 1,
-    };
-
-    const [response] = await client.generateText(request);
-    const generatedHtml = response.candidates[0].output;
+    const result = await model.generateContent(defaultPrompt);
+    const generatedHtml = await result.response.text();
+    
     res.status(200).json({ html: generatedHtml });
   } catch (error) {
     console.error("Error generate AI content:", error);
     res.status(500).json({ message: "Terjadi kesalahan saat generate konten AI" });
   }
 });
-
 
 
 // Jalankan server
