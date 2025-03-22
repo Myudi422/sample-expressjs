@@ -820,7 +820,7 @@ app.post("/api/ai/generate", async (req, res) => {
       return res.status(400).json({ message: "Prompt tidak boleh kosong" });
     }
     
-    const defaultPrompt = `buatkan konten dengan SEO Keyword yang bagus untuk "${prompt}" dengan format langsung kasih seperti <h1> <p> dan sebagiannya. jangan teks doang`;
+    const defaultPrompt = `buatkan konten dengan SEO Keyword yang bagus untuk "${prompt}" dengan format langsung seperti ini <h1>Apa itu NIB?</h1><p>abcd..</p>, intinya langsung kasih mulai dari <h1>`;
     
     const result = await model.generateContent(defaultPrompt);
     const generatedHtml = await result.response.text();
