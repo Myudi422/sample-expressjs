@@ -16,6 +16,7 @@
   "dependencies": {
     "@aws-sdk/s3-presigned-post": "^3.758.0",
     "aws-sdk": "^2.1692.0",
+    "@google/generative-ai": "0.24.0",
     "backblaze-b2": "^1.7.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
