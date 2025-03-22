@@ -820,27 +820,37 @@ app.post("/api/ai/generate", async (req, res) => {
       return res.status(400).json({ message: "Prompt tidak boleh kosong" });
     }
     
-    const defaultPrompt = `Buatkan konten artikel lengkap dengan SEO Keyword yang bagus tentang "${prompt}". 
-      Format HTML yang diminta:
-      - Mulai langsung dengan <h1>Judul</h1>
-      - Diikuti minimum 3 section dengan <h2>Subjudul</h2> dan <p>Paragraf</p>
-      - Gunakan <ul> atau <ol> untuk list jika diperlukan
+    const defaultPrompt = `Buatkan konten artikel lengkap dengan SEO Keyword tentang "${prompt}". 
+      Format HTML:
+      - Langsung mulai dengan tag HTML tanpa penjelasan
+      - Tanpa markdown/code block (```html)
+      - Minimal 3 section dengan h2
       - Bold keyword penting dengan <strong>
-      - Tidak perlu header/html/body tag
-      Contoh format yang diharapkan:
-      <h1>Apa Itu NPWP?</h1>
-      <p>NPWP atau Nomor Pokok Wajib Pajak adalah...</p>
-      <h2>Syarat Pembuatan NPWP</h2>
-      <p>Berikut persyaratan yang diperlukan...</p>`;
-    
+      - Contoh output:
+      <h1>Judul</h1><p>Paragraf pertama...</p><h2>Subjudul</h2><ul><li>Item list</li></ul>`;
+
     const result = await model.generateContent(defaultPrompt);
-    const generatedHtml = await result.response.text();
+    let generatedHtml = await result.response.text();
+
+    // Cleanup output
+    generatedHtml = generatedHtml
+      .replace(/```html/g, '')
+      .replace(/```/g, '')
+      .replace(/\n/g, '')
+      .replace(/\\n/g, '')
+      .replace(/>\s+</g, '><') // Hapus spasi antara tag
+      .replace(/\s+/g, ' ') // Hapus multiple spaces
+      .trim();
+
+    // Validasi HTML
+    const isValidHTML = /<h1>.*<\/h1>/.test(generatedHtml) && 
+                      /<h2>.*<\/h2>/.test(generatedHtml) && 
+                      /<p>.*<\/p>/.test(generatedHtml);
     
-    // Validasi dasar HTML
-    if (!generatedHtml.includes("<h1>") || !generatedHtml.includes("</h1>")) {
+    if (!isValidHTML) {
       throw new Error("Format HTML tidak sesuai");
     }
-    
+
     res.status(200).json({ html: generatedHtml });
   } catch (error) {
     console.error("Error generate AI content:", error);
