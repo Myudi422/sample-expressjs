@@ -768,15 +768,42 @@ app.get('/api/blog/:slug', async (req, res) => {
   }
 });
 
-// Endpoint GET untuk mengambil semua artikel blog
+// GET semua artikel dengan pagination
 app.get('/api/blog', async (req, res) => {
   try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
+
+    // Query untuk data
     const [rows] = await pool.execute(
-      'SELECT id, title, slug, image FROM blog ORDER BY created_at DESC'
+      'SELECT id, title, slug, image FROM blog ORDER BY created_at DESC LIMIT ? OFFSET ?',
+      [limit, offset]
     );
-    res.status(200).json(rows);
+
+    // Query untuk total data
+    const [totalRows] = await pool.execute(
+      'SELECT COUNT(*) AS total FROM blog'
+    );
+
+    res.status(200).json({
+      data: rows,
+      total: totalRows[0].total
+    });
   } catch (error) {
     console.error('Error fetching blog posts:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// DELETE artikel
+app.delete('/api/blog/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await pool.execute('DELETE FROM blog WHERE id = ?', [id]);
+    res.status(200).json({ message: 'Artikel berhasil dihapus' });
+  } catch (error) {
+    console.error('Error deleting article:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
