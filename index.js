@@ -20,7 +20,7 @@ app.use(express.json());
 
 // Inisialisasi client dengan API key yang benar
 const genAI = new GoogleGenerativeAI("AIzaSyD-dXiqCXIrupoXCSMZ3U0xHoFqRVyKKW4");
-const model = genAI.getGenerativeModel({ model: "gemini-pro" }); // Ganti model jika perlu
+const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" }); // Ganti model jika perlu
 
 
 
