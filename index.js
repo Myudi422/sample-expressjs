@@ -768,27 +768,24 @@ app.get('/api/blog/:slug', async (req, res) => {
   }
 });
 
-// GET semua artikel dengan pagination
+// GET endpoint with pagination fix
 app.get('/api/blog', async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;
 
-    // Query untuk data
+    // Convert to numbers explicitly
     const [rows] = await pool.execute(
       'SELECT id, title, slug, image FROM blog ORDER BY created_at DESC LIMIT ? OFFSET ?',
-      [limit, offset]
+      [limit.toString(), offset.toString()] // Convert to strings for MySQL compatibility
     );
 
-    // Query untuk total data
-    const [totalRows] = await pool.execute(
-      'SELECT COUNT(*) AS total FROM blog'
-    );
-
+    const [[total]] = await pool.execute('SELECT COUNT(*) AS total FROM blog');
+    
     res.status(200).json({
       data: rows,
-      total: totalRows[0].total
+      total: total.total
     });
   } catch (error) {
     console.error('Error fetching blog posts:', error);
