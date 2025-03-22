@@ -836,6 +836,23 @@ app.put('/api/blog/:slug', async (req, res) => {
   }
 });
 
+app.put('/api/blog/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, slug } = req.body;
+    
+    await pool.execute(
+      'UPDATE blog SET title = ?, slug = ? WHERE id = ?',
+      [title, slug, id]
+    );
+    
+    res.status(200).json({ message: 'Artikel berhasil diperbarui' });
+  } catch (error) {
+    console.error('Error updating article:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // Endpoint untuk generate konten AI
 app.post("/api/ai/generate", async (req, res) => {
   try {
