@@ -820,15 +820,34 @@ app.post("/api/ai/generate", async (req, res) => {
       return res.status(400).json({ message: "Prompt tidak boleh kosong" });
     }
     
-    const defaultPrompt = `buatkan konten dengan SEO Keyword yang bagus untuk "${prompt}" dengan format langsung seperti ini <h1>Apa itu NIB?</h1><p>abcd..</p>, intinya langsung kasih mulai dari <h1>`;
+    const defaultPrompt = `Buatkan konten artikel lengkap dengan SEO Keyword yang bagus tentang "${prompt}". 
+      Format HTML yang diminta:
+      - Mulai langsung dengan <h1>Judul</h1>
+      - Diikuti minimum 3 section dengan <h2>Subjudul</h2> dan <p>Paragraf</p>
+      - Gunakan <ul> atau <ol> untuk list jika diperlukan
+      - Bold keyword penting dengan <strong>
+      - Tidak perlu header/html/body tag
+      Contoh format yang diharapkan:
+      <h1>Apa Itu NPWP?</h1>
+      <p>NPWP atau Nomor Pokok Wajib Pajak adalah...</p>
+      <h2>Syarat Pembuatan NPWP</h2>
+      <p>Berikut persyaratan yang diperlukan...</p>`;
     
     const result = await model.generateContent(defaultPrompt);
     const generatedHtml = await result.response.text();
     
+    // Validasi dasar HTML
+    if (!generatedHtml.includes("<h1>") || !generatedHtml.includes("</h1>")) {
+      throw new Error("Format HTML tidak sesuai");
+    }
+    
     res.status(200).json({ html: generatedHtml });
   } catch (error) {
     console.error("Error generate AI content:", error);
-    res.status(500).json({ message: "Terjadi kesalahan saat generate konten AI" });
+    const statusCode = error.message.includes("HTML") ? 422 : 500;
+    res.status(statusCode).json({ 
+      message: error.message || "Terjadi kesalahan saat generate konten AI"
+    });
   }
 });
 
