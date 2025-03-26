@@ -894,12 +894,15 @@ app.post("/api/ai/generate-title-slug", async (req, res) => {
     const result = await model.generateContent(generationPrompt);
     const generatedText = await result.response.text();
 
+    // Debug: Cetak response dari AI
+    console.log("Response dari AI:", generatedText);
+
     // Parse dan validasi response AI
     let generatedData;
     try {
       generatedData = JSON.parse(generatedText);
     } catch (error) {
-      throw new Error("Format response AI tidak valid");
+      throw new Error("Format response AI tidak valid: " + generatedText);
     }
 
     if (!generatedData.title || !generatedData.slug) {
@@ -924,7 +927,6 @@ app.post("/api/ai/generate-title-slug", async (req, res) => {
     });
   }
 });
-
 
 // Jalankan server
 app.listen(port, () => {
