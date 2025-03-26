@@ -875,6 +875,56 @@ app.post("/api/ai/generate", async (req, res) => {
   }
 });
 
+// Endpoint untuk generate judul dan slug
+app.post("/api/ai/generate-title-slug", async (req, res) => {
+  try {
+    const { prompt } = req.body;
+    if (!prompt) {
+      return res.status(400).json({ message: "Prompt tidak boleh kosong" });
+    }
+
+    const generationPrompt = `Buatkan judul artikel SEO-friendly dan slug URL-friendly berdasarkan topik: "${prompt}". 
+      Format response sebagai JSON:
+      {
+        "title": "Judul Artikel",
+        "slug": "judul-artikel"
+      }
+      Pastikan slug dalam huruf kecil, ganti spasi dengan tanda hubung (-), dan tanpa karakter khusus.`;
+
+    const result = await model.generateContent(generationPrompt);
+    const generatedText = await result.response.text();
+
+    // Parse dan validasi response AI
+    let generatedData;
+    try {
+      generatedData = JSON.parse(generatedText);
+    } catch (error) {
+      throw new Error("Format response AI tidak valid");
+    }
+
+    if (!generatedData.title || !generatedData.slug) {
+      throw new Error("Response AI tidak lengkap");
+    }
+
+    // Sanitasi slug
+    const sanitizedSlug = generatedData.slug
+      .toLowerCase()
+      .replace(/\s+/g, '-')
+      .replace(/[^a-z0-9-]/g, '');
+
+    res.status(200).json({ 
+      title: generatedData.title,
+      slug: sanitizedSlug
+    });
+  } catch (error) {
+    console.error("Error generate title & slug:", error);
+    const statusCode = error.message.includes("AI") ? 422 : 500;
+    res.status(statusCode).json({ 
+      message: error.message || "Terjadi kesalahan saat generate judul & slug"
+    });
+  }
+});
+
 
 // Jalankan server
 app.listen(port, () => {
